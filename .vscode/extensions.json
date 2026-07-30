@@ -1,0 +1,11 @@
+// .vscode/extensions.json (JSON — VS Code Config)
+
+{
+    "recommendations": [
+        "apathetic.file-header-ai",
+        "bierner.github-markdown-preview",
+        "editorconfig.editorconfig",
+        "usernamehw.errorlens",
+        "golang.go"
+    ]
+}

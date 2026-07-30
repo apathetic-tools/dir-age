@@ -1,0 +1,26 @@
+// dir-age.code-workspace (jsonc)
+
+// dir-age.code-workspace
+// exists so:
+// 1) we can disable all extensions in vscode and then enable them on a per-workspace basis (instead of profiles)
+// 2) we can double click the file to open vscode as a convenience (then click reopen in WSL)
+{
+  "folders": [
+    {
+      "path": ".",
+    },
+  ],
+  "settings": {
+    "claudeCode.environmentVariables": [
+      {
+        "name": "NO_COLOR",
+        "value": "1"
+      }
+    ],
+    "claudeCode.initialPermissionMode": "acceptEdits",
+    "chat.tools.terminal.autoApprove": {
+      "timeout": true,
+    },
+    "chat.disableAIFeatures": false,
+  },
+}
