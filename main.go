@@ -67,40 +67,45 @@ func analyze(root string) result {
 		return r
 	}
 
-	// The base skip list for the whole scan (see resolveSkipDirs), tracked
+	// The base ignore rules for the whole scan (see resolveSkipDirs), tracked
 	// alongside the directory it applies from so a `.dir-age-ignore` found
 	// deeper in the tree can override it for just that subtree, the same way
 	// .gitignore cascades: nested rules win locally without affecting
 	// siblings or the parent scan.
 	type ignoreFrame struct {
-		dir  string
-		skip map[string]bool
+		dir   string
+		rules ignoreRules
 	}
-	stack := []ignoreFrame{{dir: root, skip: resolveSkipDirs(root)}}
+	stack := []ignoreFrame{{dir: root, rules: resolveSkipDirs(root)}}
 
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if d.IsDir() {
-			if path == root {
-				return nil
-			}
+		if path == root {
+			return nil
+		}
 
-			for len(stack) > 1 && stack[len(stack)-1].dir != filepath.Dir(path) {
-				stack = stack[:len(stack)-1]
-			}
-			parent := stack[len(stack)-1]
+		for len(stack) > 1 && stack[len(stack)-1].dir != filepath.Dir(path) {
+			stack = stack[:len(stack)-1]
+		}
+		parent := stack[len(stack)-1]
 
-			if parent.skip[d.Name()] {
+		isDir := d.IsDir()
+		relPath, _ := filepath.Rel(parent.rules.anchor, path)
+		if matchAny(parent.rules.patterns, relPath, isDir) {
+			if isDir {
 				return fs.SkipDir
 			}
+			return nil
+		}
 
-			effective := parent.skip
-			if names, ok := readIgnoreFile(filepath.Join(path, ignoreFileName)); ok {
-				effective = names
+		if isDir {
+			effective := parent.rules
+			if patterns, ok := readIgnoreFile(filepath.Join(path, ignoreFileName)); ok {
+				effective = ignoreRules{anchor: path, patterns: patterns}
 			}
-			stack = append(stack, ignoreFrame{dir: path, skip: effective})
+			stack = append(stack, ignoreFrame{dir: path, rules: effective})
 			return nil
 		}
 		if d.Name() == ignoreFileName {

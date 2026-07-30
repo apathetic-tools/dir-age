@@ -265,6 +265,160 @@ func TestAnalyzeDirectory_NestedIgnoreFileScopesToItsOwnSubtreeOnly(t *testing.T
 	}
 }
 
+func TestAnalyzeDirectory_IgnoreFileSkipsFilesByWildcard(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ignoreFileName), []byte("*.log\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	kept := mustWriteFile(t, dir, "a.txt")
+	skipped := mustWriteFile(t, dir, filepath.Join("sub", "debug.log"))
+
+	withStubTimes(t, map[string]stubTime{
+		kept:    {mod: date(2022, 1, 1), birth: date(2022, 1, 1)},
+		skipped: {mod: date(1999, 1, 1), birth: date(1999, 1, 1)},
+	})
+
+	r := analyze(dir)
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.fileCount != 1 {
+		t.Errorf("fileCount = %d, want 1 (*.log files should be skipped at any depth)", r.fileCount)
+	}
+	if want := date(2022, 1, 1); !r.earliest.Equal(want) {
+		t.Errorf("earliest = %v, want %v (debug.log leaked into aggregation)", r.earliest, want)
+	}
+}
+
+func TestAnalyzeDirectory_IgnoreFileAnchoredPatternOnlyMatchesAtRoot(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ignoreFileName), []byte("/only-root\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	skippedAtRoot := mustWriteFile(t, dir, filepath.Join("only-root", "a.txt"))
+	keptNested := mustWriteFile(t, dir, filepath.Join("sub", "only-root", "b.txt"))
+
+	withStubTimes(t, map[string]stubTime{
+		skippedAtRoot: {mod: date(1999, 1, 1), birth: date(1999, 1, 1)},
+		keptNested:    {mod: date(2022, 1, 1), birth: date(2022, 1, 1)},
+	})
+
+	r := analyze(dir)
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.fileCount != 1 {
+		t.Errorf("fileCount = %d, want 1 (/only-root should only skip the top-level directory, not sub/only-root)", r.fileCount)
+	}
+	if want := date(2022, 1, 1); !r.earliest.Equal(want) {
+		t.Errorf("earliest = %v, want %v", r.earliest, want)
+	}
+}
+
+func TestAnalyzeDirectory_IgnoreFileAnchoredPathMatchesExactLocation(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ignoreFileName), []byte("sub/skip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	skipped := mustWriteFile(t, dir, filepath.Join("sub", "skip", "a.txt"))
+	kept := mustWriteFile(t, dir, filepath.Join("other", "sub", "skip", "b.txt"))
+
+	withStubTimes(t, map[string]stubTime{
+		skipped: {mod: date(1999, 1, 1), birth: date(1999, 1, 1)},
+		kept:    {mod: date(2022, 1, 1), birth: date(2022, 1, 1)},
+	})
+
+	r := analyze(dir)
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.fileCount != 1 {
+		t.Errorf("fileCount = %d, want 1 (sub/skip should only match at that exact path, not other/sub/skip)", r.fileCount)
+	}
+}
+
+func TestAnalyzeDirectory_IgnoreFileNegationReincludesFile(t *testing.T) {
+	dir := t.TempDir()
+	content := "*.log\n!keep.log\n"
+	if err := os.WriteFile(filepath.Join(dir, ignoreFileName), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	kept := mustWriteFile(t, dir, "keep.log")
+	skipped := mustWriteFile(t, dir, "debug.log")
+
+	withStubTimes(t, map[string]stubTime{
+		kept:    {mod: date(2022, 1, 1), birth: date(2022, 1, 1)},
+		skipped: {mod: date(1999, 1, 1), birth: date(1999, 1, 1)},
+	})
+
+	r := analyze(dir)
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.fileCount != 1 {
+		t.Errorf("fileCount = %d, want 1 (keep.log should be re-included by the '!' rule)", r.fileCount)
+	}
+	if want := date(2022, 1, 1); !r.earliest.Equal(want) {
+		t.Errorf("earliest = %v, want %v", r.earliest, want)
+	}
+}
+
+func TestAnalyzeDirectory_IgnoreFileDirOnlySuffixDoesNotSkipSameNamedFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ignoreFileName), []byte("build/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A file and a directory can't share a name in the same parent, so put
+	// them under separate parents but governed by the same ignore file.
+	skippedDir := mustWriteFile(t, dir, filepath.Join("dir-variant", "build", "a.txt"))
+	keptFile := mustWriteFile(t, dir, filepath.Join("file-variant", "build")) // a plain file named "build"
+	_ = skippedDir
+
+	withStubTimes(t, map[string]stubTime{
+		keptFile: {mod: date(2022, 1, 1), birth: date(2022, 1, 1)},
+	})
+
+	r := analyze(dir)
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.fileCount != 1 {
+		t.Errorf("fileCount = %d, want 1 (build/ should skip the directory but not a file also named build)", r.fileCount)
+	}
+}
+
+func TestAnalyzeDirectory_IgnoreFileSkipsSiblingFileAfterSubdirectory(t *testing.T) {
+	// Regression guard: a file that comes after a subdirectory at the same
+	// level (alphabetically) must still be checked against the correct
+	// (immediate parent's) ignore rules, not whatever rules were left on top
+	// of the stack from walking that earlier subdirectory.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ignoreFileName), []byte("*.log\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	inSubdir := mustWriteFile(t, dir, filepath.Join("aaa-sub", "kept.txt"))
+	siblingSkipped := mustWriteFile(t, dir, "zzz-debug.log")
+
+	withStubTimes(t, map[string]stubTime{
+		inSubdir:       {mod: date(2022, 1, 1), birth: date(2022, 1, 1)},
+		siblingSkipped: {mod: date(1999, 1, 1), birth: date(1999, 1, 1)},
+	})
+
+	r := analyze(dir)
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.fileCount != 1 {
+		t.Errorf("fileCount = %d, want 1 (zzz-debug.log should be skipped even though it's visited after aaa-sub/)", r.fileCount)
+	}
+}
+
 // --- test helpers ---
 
 type stubTime struct {

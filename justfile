@@ -11,3 +11,14 @@ run *args: build
 # run the test suite
 test:
     go test ./...
+
+# check code formatting (fails if any files need gofmt)
+fmt:
+    test -z "$(gofmt -l .)"
+
+# run go vet
+vet:
+    go vet ./...
+
+# run fmt, vet, and the test suite - use this before committing
+check: fmt vet test
