@@ -8,6 +8,12 @@ reflects whenever it was last copied or checked out).
 
 Drag a folder onto the executable, or run it from the command line.
 
+---
+
+***[Issues](https://github.com/apathetic-tools/dir-age/issues)* are only for bugs with the intended functionality of an existing implemented feature, for everything else use *[Discussions](https://github.com/apathetic-tools/dir-age/discussions)*, including feature requests, installation and program support.**
+
+---
+
 ## Usage
 
 ```
