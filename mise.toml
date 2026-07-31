@@ -1,0 +1,4 @@
+# Runtime pinning only (Node, for the release tooling in package.json) —
+# not a task runner. Dev tasks live in the justfile.
+[tools]
+node = "24"

@@ -14,6 +14,30 @@ Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
 - [Go](https://go.dev/) 1.26 or later.
 - [just](https://github.com/casey/just) (optional, but the commands below
   assume it).
+- [Node.js](https://nodejs.org/) 24+ (optional) — only needed for local git
+  hook conveniences (commit message linting, plus mirrors of `just fmt`/
+  `just check`); none of it is required to open a PR, see
+  [Commit messages](#commit-messages) below. [mise](https://mise.jdx.dev/)
+  users can just run `mise install` (a `.node-version`/`mise.toml` pin is
+  checked in). Node 24's bundled npm (11.16+) also enforces the
+  `min-release-age` setting in [.npmrc](../.npmrc), which refuses to install
+  a dependency version published less than 7 days ago — expect `npm install`
+  to reject a version bump that's too fresh; wait a few days or pin an
+  older version.
+
+## Tooling
+
+Three separate tools show up in this repo; they don't overlap, each has one
+job:
+
+| Tool   | Job                                              | Contributors run it? |
+| ------ | ------------------------------------------------ | --------------------- |
+| `just` | Go dev tasks — build/run/test/fmt/vet/check       | Yes, day-to-day.       |
+| `mise` | Pins the Node version for the release tooling below | Optional; `.node-version` works with fnm/nvm/asdf too. |
+| `npm`  | Hosts the release-automation packages (semantic-release, commitlint, husky) | Rarely directly — mostly runs via git hooks and CI. |
+
+`mise` is runtime-pinning only, not a task runner — it has no tasks defined
+in this repo, and dev tasks live in the justfile, not `mise.toml`.
 
 ## Getting started
 
@@ -68,6 +92,49 @@ new flag or config file format, consider whether the built-in defaults or
 the existing `.dir-age-ignore` mechanism already cover it — a bug fix or a
 better default is usually preferable to a new knob.
 
+## Commit messages
+
+Commit messages (specifically each PR's squashed/merged commit on `main`)
+must follow [Conventional Commits](https://www.conventionalcommits.org/),
+e.g. `fix: handle missing birth time on network shares` or
+`feat: add --foo flag`. This is what drives releases — see
+[Releases](#releases) below — so the type matters:
+
+- `fix:` — patch release.
+- `feat:` — minor release.
+- `feat!:`, `fix!:`, or a `BREAKING CHANGE:` footer — major release.
+- `chore:`, `docs:`, `test:`, `refactor:`, `ci:` — no release triggered.
+
+CI lints your **PR title** against this on every PR (see
+[.github/workflows/commitlint.yml](../.github/workflows/commitlint.yml)) —
+that's what actually needs to conform, since it becomes the squash-merge
+commit message on `main` that semantic-release reads. This runs
+regardless of whether you have Node installed locally, so `npm` is never
+required just to open a PR.
+
+If you do have Node installed (see [Prerequisites](#prerequisites)), running
+`npm install` once after cloning additionally enables a `commit-msg` git
+hook that lints every local commit message as you write it via
+[commitlint](https://commitlint.js.org/) — a convenience, not something
+your PR depends on.
+
+`npm install` also enables two Go-only git hooks (no Node involved in
+running them): `pre-commit` runs `just fmt`, and `pre-push` runs
+`just check` (fmt + vet + test). Both fall back to the plain `go`/`gofmt`
+equivalents if `just` isn't installed.
+
+## Releases
+
+Releases are fully automated with
+[semantic-release](https://semantic-release.gitbook.io/): every push to
+`main` inspects the commit messages since the last release, and if any
+warrant one, it tags a new version, generates `CHANGELOG.md`, and publishes
+a GitHub Release with cross-compiled binaries attached
+(see [.releaserc.json](../.releaserc.json) and
+[scripts/build-release-assets.sh](../scripts/build-release-assets.sh)).
+There's no manual tagging or version bumping — just merge commits with the
+right type.
+
 ## Submitting changes
 
 1. Open an issue first for anything beyond a small fix, so we can agree on
@@ -75,3 +142,5 @@ better default is usually preferable to a new knob.
 2. Keep PRs focused — one change per PR.
 3. Make sure `go test ./...` and `go vet ./...` pass.
 4. Describe *why* the change is needed, not just what it does.
+5. Use a [Conventional Commits](https://www.conventionalcommits.org/) type
+   for the PR title/commit message — see [Commit messages](#commit-messages).

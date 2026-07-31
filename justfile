@@ -12,9 +12,9 @@ run *args: build
 test:
     go test ./...
 
-# check code formatting (fails if any files need gofmt)
+# check code formatting (fails if any files need gofmt, or don't parse)
 fmt:
-    test -z "$(gofmt -l .)"
+    test -z "$(gofmt -l . 2>&1)"
 
 # run go vet
 vet:

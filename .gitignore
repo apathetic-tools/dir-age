@@ -10,6 +10,11 @@
 
 # build artifacts
 /build/
+/dist/
+
+# Node tooling (release automation)
+/node_modules/
+npm-debug.log*
 
 # Test binary, built with `go test -c`
 *.test
