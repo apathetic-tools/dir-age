@@ -20,10 +20,14 @@ var defaultSkipNames = []string{
 	".git", ".svn", ".hg", ".bzr",
 
 	// dependencies / packages
-	"node_modules", "vendor", ".venv", "venv", "__pycache__", ".tox",
+	"node_modules", "vendor", ".venv", "venv", "__pycache__", ".tox", "Pods",
 
 	// build output / caches
 	"build", "dist", "target", ".next", ".nuxt", ".cache", ".mypy_cache", ".pytest_cache",
+	"CMakeFiles", ".deps", ".libs", "cmake-build-*", "GeneratedFiles", "DerivedData",
+
+	// infra / tooling caches
+	".terraform", ".gradle",
 }
 
 var defaultSkipPatterns = parseLines(defaultSkipNames)
