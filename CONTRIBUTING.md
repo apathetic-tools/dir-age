@@ -85,6 +85,18 @@ go vet ./...
   (scanned path → its ancestors → beside the executable → built-in
   defaults), plus that nested overrides stay scoped to their own subtree.
 
+## Claude Code plugins
+
+If you use [Claude Code](https://claude.com/claude-code), [.claude/settings.json](../.claude/settings.json)
+enables the [ponytail](https://github.com/DietrichGebert/ponytail) plugin
+project-wide — lazy-senior-dev mode: YAGNI, stdlib/existing-helper first, no
+unrequested abstractions. Fits [Project philosophy](#project-philosophy)
+below.
+
+Also recommended, contributor's own choice, not enforced:
+[caveman](https://github.com/JuliusBrussee/caveman) — terse, low-token
+responses.
+
 ## Project philosophy
 
 This tool is meant to be zero-config with sensible defaults. Before adding a

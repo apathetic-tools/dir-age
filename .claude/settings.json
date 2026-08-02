@@ -21,5 +21,8 @@
     "additionalDirectories": [
       "\\tmp"
     ]
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true
   }
 }
